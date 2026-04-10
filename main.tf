@@ -63,6 +63,10 @@ resource "azurerm_linux_virtual_machine" "ise" {
 
   network_interface_ids = [azurerm_network_interface.ise.id]
 
+  # ISE does not use the Azure guest agent — disable to prevent OSProvisioningTimedOut
+  provision_vm_agent         = false
+  allow_extension_operations = false
+
   admin_ssh_key {
     username   = "iseadmin"
     public_key = data.azurerm_ssh_public_key.ise.public_key
@@ -94,7 +98,7 @@ resource "azurerm_linux_virtual_machine" "ise" {
     "hostname=vm-dev-smp-uks-ise",
     "primarynameserver=8.8.8.8",
     "dnsdomain=test.com",
-    "ntpserver=10.205.0.4",
+    "ntpserver=216.239.35.0",
     "timezone=UTC",
     "password=${var.ise_password}",
     "ersapi=no",
