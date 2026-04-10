@@ -65,7 +65,7 @@ ISE is configured at boot via Azure VM **User Data** (not custom data). The foll
 hostname=vm-dev-smp-uks-ise
 primarynameserver=8.8.8.8
 dnsdomain=test.com
-ntpserver=10.205.0.4
+ntpserver=216.239.35.0
 timezone=UTC
 ersapi=no
 openapi=no
