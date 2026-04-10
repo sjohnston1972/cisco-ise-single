@@ -98,7 +98,7 @@ resource "azurerm_linux_virtual_machine" "ise" {
     "hostname=vm-dev-smp-uks-ise",
     "primarynameserver=8.8.8.8",
     "dnsdomain=test.com",
-    "ntpserver=216.239.35.0",
+    "ntpserver=168.63.129.16",
     "timezone=UTC",
     "password=${var.ise_password}",
     "ersapi=no",
