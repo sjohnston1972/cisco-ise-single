@@ -95,10 +95,10 @@ The DC is configured with the following domain, groups, and users:
 
 | User | Groups | Password |
 |---|---|---|
-| `labadmin@lab.com` | ISE-Admins, ISE-Network-RW | `Cisco1234!` |
-| `labrw@lab.com` | ISE-Network-RW | `Cisco1234!` |
-| `labro@lab.com` | ISE-Network-RO | `Cisco1234!` |
-| `svc-ise@lab.com` | *(ISE join account)* | `Cisco1234!` |
+| `labadmin@lab.com` | ISE-Admins, ISE-Network-RW | see `.env` |
+| `labrw@lab.com` | ISE-Network-RW | see `.env` |
+| `labro@lab.com` | ISE-Network-RO | see `.env` |
+| `svc-ise@lab.com` | *(ISE join account)* | see `.env` |
 
 ISE is joined to `lab.com` via `svc-ise@lab.com`. The AD identity source is named `lab.com` inside ISE.
 
@@ -178,7 +178,7 @@ Located in ISE at:
 
 | Device Name | IP | TACACS Secret |
 |---|---|---|
-| C8Kv-Router | 10.10.1.30 | `Cisco123` |
+| C8Kv-Router | 10.10.1.30 | see `.env` |
 
 ## C8000v Router TACACS Configuration
 
@@ -187,12 +187,12 @@ Full dual-ISE TACACS config as deployed and tested:
 ```
 tacacs server ISE-PRIMARY
  address ipv4 10.10.1.10
- key Cisco123
+ key <tacacs-secret>
  timeout 3
 !
 tacacs server ISE-SECONDARY
  address ipv4 10.20.1.10
- key Cisco123
+ key <tacacs-secret>
  timeout 3
 !
 aaa group server tacacs+ ISE-GROUP
@@ -232,12 +232,12 @@ line vty 0 4
 ```
 tacacs server ISE-PRIMARY
  address ipv4 10.10.1.10
- key Cisco123
+ key <tacacs-secret>
  timeout 3
 !
 tacacs server ISE-SECONDARY
  address ipv4 10.20.1.10
- key Cisco123
+ key <tacacs-secret>
  timeout 3
 !
 aaa group server tacacs+ ISE-GROUP
@@ -254,7 +254,7 @@ aaa new-model
 ### Step 3 — Test both ISE nodes
 *Do not proceed if either test fails.*
 ```
-test aaa group ISE-GROUP labadmin Cisco1234! legacy
+test aaa group ISE-GROUP labadmin <password> legacy
 ```
 Expected: `User was successfully authenticated.`
 
@@ -263,7 +263,7 @@ To test secondary specifically:
 tacacs server ISE-PRIMARY
  shutdown
 !
-test aaa group ISE-GROUP labadmin Cisco1234! legacy
+test aaa group ISE-GROUP labadmin <password> legacy
 !
 tacacs server ISE-PRIMARY
  no shutdown
