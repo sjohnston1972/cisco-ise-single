@@ -1,111 +1,219 @@
 # ------------------------------------------------------------------
-# Data sources — reference pre-existing resources
+# ISE 3.4 deployment — rg-dev-smp-uks-ise
+#   vm-ise-pri-uks  ISE primary   (PIP)
+#   vm-ise-sec-uks  ISE secondary (PIP)
+#   vm-dc-pri-uks   Windows DC    (no PIP)
+#   vm-c8kv-pri-uks Cisco C8000v  (no PIP, dual NIC)
 # ------------------------------------------------------------------
 
-data "azurerm_public_ip" "ise" {
-  name                = "pip-dev-smp-uks-ise"
-  resource_group_name = var.resource_group_name
-}
-
-data "azurerm_ssh_public_key" "ise" {
-  name                = "kp-dev-smp-uks-ise"
-  resource_group_name = var.resource_group_name
-}
-
 # ------------------------------------------------------------------
-# Accept Cisco ISE marketplace terms (only runs once per subscription)
-# If this errors with "already accepted", either remove this resource
-# or import it: terraform import azurerm_marketplace_agreement.ise cisco:cisco-ise-virtual:cisco-ise_3_4
+# Resource group
 # ------------------------------------------------------------------
 
-resource "azurerm_marketplace_agreement" "ise" {
-  publisher = "cisco"
-  offer     = "cisco-ise-virtual"
-  plan      = "cisco-ise_3_4"
+resource "azurerm_resource_group" "ise" {
+  name     = var.resource_group_name
+  location = var.location
 }
 
 # ------------------------------------------------------------------
-# NIC — attached to existing subnet (NSG already applied at subnet level)
+# Networking — VNet + subnet + NSG
 # ------------------------------------------------------------------
 
-resource "azurerm_network_interface" "ise" {
-  name                = "vm-dev-smp-uks-ise-nic"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+resource "azurerm_virtual_network" "ise" {
+  name                = "vnet-ise"
+  resource_group_name = azurerm_resource_group.ise.name
+  location            = azurerm_resource_group.ise.location
+  address_space       = ["10.10.0.0/16"]
+}
+
+resource "azurerm_subnet" "ise" {
+  name                 = "snet-ise"
+  resource_group_name  = azurerm_resource_group.ise.name
+  virtual_network_name = azurerm_virtual_network.ise.name
+  address_prefixes     = ["10.10.1.0/24"]
+}
+
+resource "azurerm_network_security_group" "permit_all" {
+  name                = "permit-all"
+  resource_group_name = azurerm_resource_group.ise.name
+  location            = azurerm_resource_group.ise.location
+
+  security_rule {
+    name                       = "AllowAllInbound"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
+  security_rule {
+    name                       = "AllowAllOutbound"
+    priority                   = 100
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_subnet_network_security_group_association" "ise" {
+  subnet_id                 = azurerm_subnet.ise.id
+  network_security_group_id = azurerm_network_security_group.permit_all.id
+}
+
+# ------------------------------------------------------------------
+# SSH key — shared across VMs managed by this config
+# ------------------------------------------------------------------
+
+resource "tls_private_key" "ise" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "local_sensitive_file" "ise_private_key" {
+  content         = tls_private_key.ise.private_key_pem
+  filename        = "${path.module}/ise_private_key.pem"
+  file_permission = "0600"
+}
+
+# ------------------------------------------------------------------
+# Windows Server DC — vm-dc-pri-uks
+# ------------------------------------------------------------------
+
+resource "azurerm_network_interface" "dc" {
+  name                = "nic-dc-pri-uks"
+  location            = azurerm_resource_group.ise.location
+  resource_group_name = azurerm_resource_group.ise.name
 
   ip_configuration {
     name                          = "ipconfig1"
-    subnet_id                     = "/subscriptions/b46523b7-ac82-42f2-821c-195c03c0bcef/resourceGroups/rg-dev-smp-uks-net/providers/Microsoft.Network/virtualNetworks/vnet-dev-smp-uks-svc/subnets/snet-dev-smp-uks-svc-ise"
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = data.azurerm_public_ip.ise.id
+    subnet_id                     = azurerm_subnet.ise.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.10.1.20"
   }
 }
 
-# ------------------------------------------------------------------
-# ISE VM
-#
-# WARNING: Standard_D2s_v2 (2 vCPU / 8 GB) is below Cisco's minimum
-# for ISE 3.4. The VM will likely fail to initialise. Minimum sizes:
-#   Evaluation : Standard_D4s_v3  (4 vCPU / 16 GB)
-#   Production : Standard_D16s_v3 (16 vCPU / 64 GB)
-#
-# NTP fix: custom_data must be plain key=value text, base64-encoded
-# exactly once. join("\n", [...]) + base64encode() achieves this and
-# avoids the double-encoding that causes the "NTP server required" error.
-# ------------------------------------------------------------------
+resource "azurerm_windows_virtual_machine" "dc" {
+  name                = "vm-dc-pri-uks"
+  location            = azurerm_resource_group.ise.location
+  resource_group_name = azurerm_resource_group.ise.name
+  size                = "Standard_B2ms"
+  admin_username      = "azureadmin"
+  admin_password      = var.dc_admin_password
 
-resource "azurerm_linux_virtual_machine" "ise" {
-  name                = "vm-dev-smp-uks-ise"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  size                = "Standard_D4s_v3"
-  admin_username      = "iseadmin"
-
-  network_interface_ids = [azurerm_network_interface.ise.id]
-
-  # ISE does not use the Azure guest agent — disable to prevent OSProvisioningTimedOut
-  provision_vm_agent         = false
-  allow_extension_operations = false
-
-  admin_ssh_key {
-    username   = "iseadmin"
-    public_key = data.azurerm_ssh_public_key.ise.public_key
-  }
+  network_interface_ids = [azurerm_network_interface.dc.id]
 
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Premium_LRS"
-    disk_size_gb         = 300
+    disk_size_gb         = 128
+  }
+
+  source_image_reference {
+    publisher = "MicrosoftWindowsServer"
+    offer     = "WindowsServer"
+    sku       = "2022-Datacenter"
+    version   = "latest"
+  }
+
+  boot_diagnostics {}
+}
+
+# ------------------------------------------------------------------
+# Cisco C8000v — vm-c8kv-pri-uks
+# Two interfaces: Gi1 (management/WAN) + Gi2 (LAN).
+# IP forwarding enabled on both NICs.
+# PAYG-essentials licence billed via Azure Marketplace.
+# ------------------------------------------------------------------
+
+resource "azurerm_marketplace_agreement" "c8kv" {
+  publisher = "cisco"
+  offer     = "cisco-c8000v"
+  plan      = "17_15_02a-payg-essentials"
+}
+
+resource "azurerm_network_interface" "c8kv_gi1" {
+  name                  = "nic-c8kv-gi1"
+  location              = "uksouth"
+  resource_group_name   = "rg-ise-pri-uks"
+  ip_forwarding_enabled = true
+
+  ip_configuration {
+    name                          = "ipconfig1"
+    subnet_id                     = "/subscriptions/b46523b7-ac82-42f2-821c-195c03c0bcef/resourceGroups/rg-ise-pri-uks/providers/Microsoft.Network/virtualNetworks/vnet-ise-uks/subnets/snet-ise-uks"
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.10.1.30"
+  }
+}
+
+resource "azurerm_network_interface" "c8kv_gi2" {
+  name                  = "nic-c8kv-gi2"
+  location              = "uksouth"
+  resource_group_name   = "rg-ise-pri-uks"
+  ip_forwarding_enabled = true
+
+  ip_configuration {
+    name                          = "ipconfig1"
+    subnet_id                     = "/subscriptions/b46523b7-ac82-42f2-821c-195c03c0bcef/resourceGroups/rg-ise-pri-uks/providers/Microsoft.Network/virtualNetworks/vnet-ise-uks/subnets/snet-ise-uks"
+    private_ip_address_allocation = "Static"
+    private_ip_address            = "10.10.1.31"
+  }
+}
+
+resource "azurerm_linux_virtual_machine" "c8kv" {
+  name                            = "vm-c8kv-pri-uks"
+  location                        = azurerm_resource_group.ise.location
+  resource_group_name             = azurerm_resource_group.ise.name
+  size                            = "Standard_D2s_v3"
+  admin_username                  = "ciscoadmin"
+  admin_password                  = var.c8kv_admin_password
+  disable_password_authentication = false
+
+  # Gi1 must be first (primary NIC / management)
+  network_interface_ids = [
+    azurerm_network_interface.c8kv_gi1.id,
+    azurerm_network_interface.c8kv_gi2.id,
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+    disk_size_gb         = 16
   }
 
   source_image_reference {
     publisher = "cisco"
-    offer     = "cisco-ise-virtual"
-    sku       = "cisco-ise_3_4"
-    version   = "3.4.608"
+    offer     = "cisco-c8000v"
+    sku       = "17_15_02a-payg-essentials"
+    version   = "latest"
   }
 
   plan {
-    name      = "cisco-ise_3_4"
-    product   = "cisco-ise-virtual"
+    name      = "17_15_02a-payg-essentials"
+    product   = "cisco-c8000v"
     publisher = "cisco"
   }
 
-  # ISE reads Azure VM User Data (NOT custom data) at first boot.
-  # Must be plain key=value pairs, base64-encoded once.
-  # user_data maps to the "User Data" field on the Azure portal Advanced tab.
-  user_data = base64encode(join("\n", [
-    "hostname=vm-dev-smp-uks-ise",
-    "primarynameserver=8.8.8.8",
-    "dnsdomain=test.com",
-    "ntpserver=168.63.129.16",
-    "timezone=UTC",
-    "password=${var.ise_password}",
-    "ersapi=no",
-    "openapi=no",
-    "pxGrid=no",
-    "pxgrid_cloud=no",
-  ]))
+  boot_diagnostics {}
 
-  depends_on = [azurerm_marketplace_agreement.ise]
+  depends_on = [azurerm_marketplace_agreement.c8kv]
+}
+
+output "dc_private_ip" {
+  value = azurerm_network_interface.dc.private_ip_address
+}
+
+output "c8kv_gi1_ip" {
+  value = azurerm_network_interface.c8kv_gi1.private_ip_address
+}
+
+output "c8kv_gi2_ip" {
+  value = azurerm_network_interface.c8kv_gi2.private_ip_address
 }
