@@ -47,7 +47,7 @@ rg-ise-sec-ukw  (deployed separately)
 ## Prerequisites
 
 - Azure subscription
-- Terraform >= 1.0
+- Terraform >= 1.5.0 (enforced by `required_version` in `providers.tf`)
 - Azure CLI authenticated (`az login`)
 
 ## Usage
@@ -58,11 +58,17 @@ rg-ise-sec-ukw  (deployed separately)
    cd cisco-ise-dual_tacacs
    ```
 
-2. Create `terraform.tfvars`:
+2. Create `terraform.tfvars` (git-ignored -- never commit real secrets):
    ```hcl
-   dc_admin_password   = "YourDCPassword"
-   c8kv_admin_password = "YourC8KvPassword"
+   subscription_id      = "00000000-0000-0000-0000-000000000000"
+   dc_admin_password    = "YourDCPassword-12+chars-3-of-4-complexity"
+   c8kv_admin_password  = "YourC8KvPassword-12+chars-3-of-4-complexity"
+   allowed_inbound_cidr = "203.0.113.4/32" # or leave the VirtualNetwork default
    ```
+   Both passwords are validated at `plan` time: 12+ characters and at least
+   3 of uppercase / lowercase / digit / special-character (Azure's VM
+   password complexity rule). `c8kv_admin_password` additionally must not
+   contain the admin username `ciscoadmin`.
 
 3. Initialise and apply:
    ```bash
@@ -70,15 +76,53 @@ rg-ise-sec-ukw  (deployed separately)
    terraform plan
    terraform apply
    ```
+   This config uses local Terraform state by default. See "Remote State"
+   below to opt into an Azure Storage backend instead.
 
 ## Variables
 
 | Variable | Description | Default |
 |---|---|---|
+| `subscription_id` | Azure subscription ID to deploy into | *(required)* |
 | `resource_group_name` | Resource group for created resources | `rg-dev-smp-uks-ise` |
 | `location` | Azure region | `uksouth` |
-| `dc_admin_password` | Windows DC admin password (sensitive) | *(required)* |
-| `c8kv_admin_password` | C8Kv admin password (sensitive) | *(required)* |
+| `dc_admin_password` | Windows DC admin password (sensitive, validated) | *(required)* |
+| `c8kv_admin_password` | C8Kv admin password (sensitive, validated) | *(required)* |
+| `allowed_inbound_cidr` | Source CIDR / service tag allowed inbound to the lab subnet (validated) | `VirtualNetwork` |
+
+## Remote State (optional)
+
+By default Terraform state is stored locally in `terraform.tfstate`
+(git-ignored). That's fine for a single person on a single laptop, but it
+gives no state locking, is easy to lose, and holds secrets in plaintext on
+disk. For anything beyond solo/local use, switch to an `azurerm` (Azure
+Storage) backend:
+
+1. Create the storage account once, outside this config, so it can't
+   accidentally delete its own state:
+   ```bash
+   az group create -n rg-tfstate -l uksouth
+   az storage account create -n <globally-unique-name> -g rg-tfstate \
+     -l uksouth --sku Standard_LRS --min-tls-version TLS1_2
+   az storage container create -n tfstate --account-name <globally-unique-name>
+   ```
+2. Copy `backend.tf.example` to `backend.tf` (git-ignored, so real values
+   never get committed) and fill in the storage account details, or leave
+   the block empty and supply them via `-backend-config`:
+   ```bash
+   terraform init \
+     -backend-config="resource_group_name=rg-tfstate" \
+     -backend-config="storage_account_name=<globally-unique-name>" \
+     -backend-config="container_name=tfstate" \
+     -backend-config="key=cisco-ise-dual_tacacs.tfstate"
+   ```
+3. If you already have local state, `terraform init -migrate-state` moves
+   it into the new backend.
+
+Terraform reads whatever backend block is present at init time. CI never
+copies `backend.tf` in, so it always runs `terraform init -backend=false`
+and validates against the local/null backend -- no cloud credentials needed
+just to lint and validate.
 
 ## Active Directory (lab.com)
 

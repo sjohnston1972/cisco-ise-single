@@ -1,0 +1,33 @@
+# Remote state backend (opt-in).
+#
+# By default this config uses local state (terraform.tfstate, already
+# git-ignored). For anything beyond a single person on a single laptop,
+# switch to an Azure Storage (azurerm) backend instead -- it gives you
+# state locking and stops the state file (which contains secrets) from
+# living unencrypted on disk.
+#
+# To opt in:
+#   1. Create the storage account once (outside this config, so it can't
+#      delete its own state):
+#        az group create -n rg-tfstate -l uksouth
+#        az storage account create -n <globally-unique-name> -g rg-tfstate \
+#          -l uksouth --sku Standard_LRS --min-tls-version TLS1_2
+#        az storage container create -n tfstate --account-name <globally-unique-name>
+#   2. Copy this file to backend.tf (backend.tf is git-ignored -- see
+#      .gitignore -- so the real values never get committed).
+#   3. Fill in the values below, or leave them blank here and supply them
+#      with -backend-config instead (see README's "Remote State" section).
+#   4. Run: terraform init -migrate-state
+#
+# terraform init reads whatever backend block is present at init time, so
+# CI (which never copies this file in) runs with `terraform init -backend=false`
+# and stays on the null/local backend for validate-only checks.
+
+terraform {
+  backend "azurerm" {
+    # resource_group_name  = "rg-tfstate"
+    # storage_account_name = "<globally-unique-name>"
+    # container_name       = "tfstate"
+    # key                  = "cisco-ise-dual_tacacs.tfstate"
+  }
+}
