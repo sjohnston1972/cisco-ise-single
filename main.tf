@@ -46,7 +46,7 @@ resource "azurerm_network_security_group" "permit_all" {
     protocol                   = "*"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = "*"
+    source_address_prefix      = var.allowed_inbound_cidr
     destination_address_prefix = "*"
   }
 

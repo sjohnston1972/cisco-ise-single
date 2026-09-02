@@ -22,3 +22,9 @@ variable "c8kv_admin_password" {
   type      = string
   sensitive = true
 }
+
+variable "allowed_inbound_cidr" {
+  type        = string
+  description = "Source CIDR or Azure service tag permitted inbound to the lab subnet."
+  default     = "VirtualNetwork"
+}
