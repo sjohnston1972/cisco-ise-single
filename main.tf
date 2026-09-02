@@ -105,7 +105,9 @@ resource "azurerm_windows_virtual_machine" "dc" {
     publisher = "MicrosoftWindowsServer"
     offer     = "WindowsServer"
     sku       = "2022-Datacenter"
-    version   = "latest"
+    # Pinned to the latest published version as of 2026-09-02, queried via:
+    #   az vm image list --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2022-Datacenter --all -o table
+    version = "20348.5499.260809"
   }
 
   boot_diagnostics {}
@@ -177,7 +179,9 @@ resource "azurerm_linux_virtual_machine" "c8kv" {
     publisher = "cisco"
     offer     = "cisco-c8000v"
     sku       = "17_15_02a-payg-essentials"
-    version   = "latest"
+    # Pinned to the only published version as of 2026-09-02, queried via:
+    #   az vm image list --publisher cisco --offer cisco-c8000v --sku 17_15_02a-payg-essentials --all -o table
+    version = "17.15.0220250311"
   }
 
   plan {
