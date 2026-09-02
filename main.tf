@@ -141,8 +141,8 @@ resource "azurerm_marketplace_agreement" "c8kv" {
 
 resource "azurerm_network_interface" "c8kv_gi1" {
   name                  = "nic-c8kv-gi1"
-  location              = "uksouth"
-  resource_group_name   = "rg-ise-pri-uks"
+  location              = azurerm_resource_group.ise.location
+  resource_group_name   = azurerm_resource_group.ise.name
   ip_forwarding_enabled = true
 
   ip_configuration {
@@ -155,8 +155,8 @@ resource "azurerm_network_interface" "c8kv_gi1" {
 
 resource "azurerm_network_interface" "c8kv_gi2" {
   name                  = "nic-c8kv-gi2"
-  location              = "uksouth"
-  resource_group_name   = "rg-ise-pri-uks"
+  location              = azurerm_resource_group.ise.location
+  resource_group_name   = azurerm_resource_group.ise.name
   ip_forwarding_enabled = true
 
   ip_configuration {
