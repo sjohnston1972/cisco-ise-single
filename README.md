@@ -36,7 +36,7 @@ rg-ise-sec-ukw  (deployed separately)
 | Resource Group | `rg-dev-smp-uks-ise` | |
 | Virtual Network | `vnet-ise` | 10.10.0.0/16 |
 | Subnet | `snet-ise` | 10.10.1.0/24 |
-| Network Security Group | `permit-all` | Allow all inbound/outbound (lab use) |
+| Network Security Group | `permit-all` | Inbound scoped to `var.allowed_inbound_cidr` (default `VirtualNetwork`); outbound allowed (lab use) |
 | Network Interface | `nic-dc-pri-uks` | Static 10.10.1.20 |
 | Windows VM | `vm-dc-pri-uks` | Standard_B2ms, WS2022, AD DS |
 | Network Interface | `nic-c8kv-gi1` | Static 10.10.1.30, IP forwarding on |
@@ -390,7 +390,15 @@ Primary ISE (`ise-pri-uks`, 10.10.1.10) stopped via Azure. All three accounts te
 ## Notes
 
 - `terraform.tfvars` and `.env` are excluded from version control
-- The permit-all NSG is intentional for this lab — do not use in production
+- The NSG's inbound rule is scoped by the `allowed_inbound_cidr` variable
+  (default `"VirtualNetwork"`, an Azure service tag that limits inbound
+  traffic to sources inside the VNet). Set it to a specific CIDR (e.g. your
+  admin workstation's `/32`) to allow inbound access from outside the VNet.
+  **Setting it to `"*"` re-opens the subnet to the entire Internet** — the
+  variable's validation block rejects `"*"` and empty strings specifically
+  to stop that from happening by accident, but the underlying rule still
+  permits all ports/protocols from whatever source you do configure, so
+  treat this as lab convenience, not a production-grade firewall.
 - ISE first boot takes 15–20 minutes after VM creation
 - The C8Kv marketplace agreement can be imported if already accepted:
   ```bash
