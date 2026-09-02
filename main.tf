@@ -147,7 +147,7 @@ resource "azurerm_network_interface" "c8kv_gi1" {
 
   ip_configuration {
     name                          = "ipconfig1"
-    subnet_id                     = "/subscriptions/b46523b7-ac82-42f2-821c-195c03c0bcef/resourceGroups/rg-ise-pri-uks/providers/Microsoft.Network/virtualNetworks/vnet-ise-uks/subnets/snet-ise-uks"
+    subnet_id                     = azurerm_subnet.ise.id
     private_ip_address_allocation = "Static"
     private_ip_address            = "10.10.1.30"
   }
@@ -161,7 +161,7 @@ resource "azurerm_network_interface" "c8kv_gi2" {
 
   ip_configuration {
     name                          = "ipconfig1"
-    subnet_id                     = "/subscriptions/b46523b7-ac82-42f2-821c-195c03c0bcef/resourceGroups/rg-ise-pri-uks/providers/Microsoft.Network/virtualNetworks/vnet-ise-uks/subnets/snet-ise-uks"
+    subnet_id                     = azurerm_subnet.ise.id
     private_ip_address_allocation = "Static"
     private_ip_address            = "10.10.1.31"
   }
