@@ -1,5 +1,7 @@
 # cisco-ise-lab
 
+[![Terraform CI](https://github.com/sjohnston1972/cisco-ise-dual_tacacs/actions/workflows/terraform.yml/badge.svg)](https://github.com/sjohnston1972/cisco-ise-dual_tacacs/actions/workflows/terraform.yml)
+
 Terraform configuration to deploy a **Cisco ISE 3.4 distributed lab** on Microsoft Azure, including a Windows domain controller, Cisco C8000v router, and full TACACS+ Device Administration policy.
 
 ## Overview
@@ -123,6 +125,17 @@ Terraform reads whatever backend block is present at init time. CI never
 copies `backend.tf` in, so it always runs `terraform init -backend=false`
 and validates against the local/null backend -- no cloud credentials needed
 just to lint and validate.
+
+## Continuous Integration
+
+`.github/workflows/terraform.yml` runs on every push and pull request:
+`terraform fmt -check`, `terraform init -backend=false`, `terraform validate`,
+[TFLint](https://github.com/terraform-linters/tflint), and
+[Checkov](https://www.checkov.io/) (`checkov -d .`). It needs no Azure
+credentials -- everything it checks is static analysis against the
+configuration as written. Findings from TFLint/Checkov map to security and
+style issues tracked separately in the issue tracker; CI surfaces them, it
+doesn't fix them.
 
 ## Active Directory (lab.com)
 
