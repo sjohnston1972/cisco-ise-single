@@ -43,7 +43,6 @@ rg-ise-sec-ukw  (deployed separately)
 | Network Interface | `nic-c8kv-gi2` | Static 10.10.1.31, IP forwarding on |
 | Linux VM | `vm-c8kv-pri-uks` | Cisco C8000v PAYG-essentials |
 | Marketplace Agreement | Cisco C8000v | Accepted once per subscription |
-| TLS Private Key | — | RSA 4096, written to `ise_private_key.pem` |
 
 ## Prerequisites
 

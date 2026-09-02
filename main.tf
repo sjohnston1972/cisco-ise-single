@@ -69,21 +69,6 @@ resource "azurerm_subnet_network_security_group_association" "ise" {
 }
 
 # ------------------------------------------------------------------
-# SSH key — shared across VMs managed by this config
-# ------------------------------------------------------------------
-
-resource "tls_private_key" "ise" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-resource "local_sensitive_file" "ise_private_key" {
-  content         = tls_private_key.ise.private_key_pem
-  filename        = "${path.module}/ise_private_key.pem"
-  file_permission = "0600"
-}
-
-# ------------------------------------------------------------------
 # Windows Server DC — vm-dc-pri-uks
 # ------------------------------------------------------------------
 
